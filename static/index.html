@@ -342,15 +342,21 @@
               <div class="speakers-title">Speakers</div>
               <div id="speakers"></div>
             </div>
+
+            <div class="error" id="error"></div>
           </div>
         </section>
 
         <footer class="toolbar">
           <div class="buttons">
+            <select id="micSelect" class="secondary" style="padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: #f9fafb; font-family: inherit; font-size: 0.9rem; cursor: pointer;">
+              <option value="">마이크 선택...</option>
+            </select>
             <button id="recordBtn" class="primary">
               <span class="record-icon" id="recordIcon">●</span>
               <span id="recordLabel">Start</span>
             </button>
+            <button id="copyBtn" class="secondary">Copy</button>
             <button id="clearBtn" class="secondary">Clear</button>
           </div>
           <div class="hint">녹음 시작 후, 말하는 내용을 실시간으로 전사합니다.</div>
@@ -362,9 +368,11 @@
       const SAMPLE_RATE = 16000;
       const ELEVENLABS_MODEL_ID = "scribe_v2_realtime";
 
+      const micSelect = document.getElementById("micSelect");
       const recordBtn = document.getElementById("recordBtn");
       const recordIcon = document.getElementById("recordIcon");
       const recordLabel = document.getElementById("recordLabel");
+      const copyBtn = document.getElementById("copyBtn");
       const clearBtn = document.getElementById("clearBtn");
       const statusLabel = document.getElementById("statusLabel");
       const statusDot = document.getElementById("statusDot");
@@ -545,6 +553,7 @@
           model_id: ELEVENLABS_MODEL_ID,
           include_timestamps: "true",
           audio_format: "pcm_16000",
+          language: "ko",
           token: token,
         });
 
@@ -555,12 +564,18 @@
 
         ws.onopen = async () => {
           try {
+            const audioConstraints = {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            };
+
+            if (micSelect.value) {
+              audioConstraints.deviceId = { ideal: micSelect.value };
+            }
+
             mediaStream = await navigator.mediaDevices.getUserMedia({
-              audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-              },
+              audio: audioConstraints,
             });
 
             audioContext = new (window.AudioContext ||
@@ -736,8 +751,52 @@
         }
       }
 
+      async function loadMicrophones() {
+        try {
+          await navigator.mediaDevices.getUserMedia({ audio: true });
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioInputs = devices.filter(device => device.kind === "audioinput");
+
+          micSelect.innerHTML = '<option value="">기본 마이크</option>';
+          audioInputs.forEach((device, index) => {
+            const option = document.createElement("option");
+            option.value = device.deviceId;
+            option.textContent = device.label || `마이크 ${index + 1}`;
+            micSelect.appendChild(option);
+          });
+        } catch (err) {
+          console.error("마이크 목록을 불러올 수 없습니다:", err);
+        }
+      }
+
       recordBtn.addEventListener("click", () => {
         toggleRecording();
+      });
+
+      copyBtn.addEventListener("click", async () => {
+        const committedText = segments.map((s) => s.text).join(" ");
+        const fullText =
+          committedText +
+          (partialText ? (committedText ? " " : "") + partialText : "");
+
+        if (!fullText) {
+          setError("복사할 텍스트가 없습니다.");
+          setTimeout(() => setError(""), 2000);
+          return;
+        }
+
+        try {
+          await navigator.clipboard.writeText(fullText);
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => {
+            copyBtn.textContent = originalText;
+          }, 1500);
+        } catch (err) {
+          console.error("복사 실패:", err);
+          setError("클립보드 복사에 실패했습니다.");
+          setTimeout(() => setError(""), 2000);
+        }
       });
 
       clearBtn.addEventListener("click", () => {
@@ -751,6 +810,8 @@
       window.addEventListener("beforeunload", () => {
         stopAll(false);
       });
+
+      loadMicrophones();
     </script>
   </body>
 </html>
