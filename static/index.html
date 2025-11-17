@@ -4,8 +4,6 @@
     <meta charset="UTF-8" />
     <title>Realtime Speech to Text · ElevenLabs</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    <!-- 심플한 산세리프 + 한글 폰트 -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -155,7 +153,6 @@
         word-break: break-word;
       }
 
-      /* 텍스트 끝에 커서(캐럿) 표시 */
       .transcript::after {
         content: "";
         display: inline-block;
@@ -362,9 +359,6 @@
     </div>
 
     <script>
-      // 백엔드는 /scribe-token 에서 single-use token을 반환해야 합니다.
-      // FastAPI 예시: GET /scribe-token -> { "token": "<single_use_token>" }
-
       const SAMPLE_RATE = 16000;
       const ELEVENLABS_MODEL_ID = "scribe_v2_realtime";
 
@@ -387,7 +381,7 @@
       let isRecording = false;
 
       let partialText = "";
-      const segments = []; // { id, text, words? }
+      const segments = [];
 
       function setStatus(stateText, visualState) {
         statusLabel.textContent = stateText;
@@ -473,12 +467,10 @@
             let speakerKey = getRawSpeakerKey(w);
 
             if (speakerKey == null && currentGroup && currentGroup._speakerKey) {
-              // speaker 정보가 비어 있으면 이전 화자와 같은 것으로 취급 (연속성)
               speakerKey = currentGroup._speakerKey;
             }
 
             if (speakerKey == null) {
-              // 여전히 speaker 정보가 없다면, 화자 구분에서는 제외 (텍스트는 transcript에 이미 반영됨)
               continue;
             }
 
@@ -634,7 +626,6 @@
                 });
                 partialText = "";
                 updateTranscript();
-                // words는 committed_transcript_with_timestamps 에서 채움
               }
               break;
             case "committed_transcript_with_timestamps":
@@ -705,9 +696,7 @@
         if (ws) {
           try {
             ws.close();
-          } catch (e) {
-            // ignore
-          }
+          } catch (e) {}
           ws = null;
         }
 
@@ -719,7 +708,6 @@
 
       async function toggleRecording() {
         if (isRecording) {
-          // stop
           stopAll(true);
           return;
         }
