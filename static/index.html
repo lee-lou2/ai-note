@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Realtime Speech to Text · ElevenLabs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- 심플한 산세리프 + 한글 폰트 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;
+        --fg: #0f172a;
+        --fg-soft: #6b7280;
+        --border: #e5e7eb;
+        --accent: #0f172a;
+        --accent-soft: #e5e7eb;
+        --shadow-soft: 0 22px 60px rgba(15, 23, 42, 0.06);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+
+      body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Inter", "Noto Sans KR", system-ui, -apple-system,
+          BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .shell {
+        width: 100%;
+        max-width: 1024px;
+        padding: 20px;
+      }
+
+      .surface {
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        background: #ffffff;
+        box-shadow: var(--shadow-soft);
+        padding: 24px 28px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .brand-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--fg);
+      }
+
+      .brand-main {
+        font-size: 0.85rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-weight: 500;
+      }
+
+      .status-pill {
+        font-size: 0.78rem;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--accent-soft);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+
+      .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: #10b981;
+      }
+
+      .status-dot.idle {
+        background: #9ca3af;
+      }
+
+      .status-label {
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .screen {
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, #ffffff, #fafafa);
+        min-height: 220px;
+        padding: 24px 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .screen-inner {
+        max-width: 650px;
+        width: 100%;
+      }
+
+      .placeholder {
+        font-size: 0.95rem;
+        text-align: center;
+        color: var(--fg-soft);
+        line-height: 1.6;
+      }
+
+      .placeholder strong {
+        font-weight: 500;
+        color: var(--fg);
+      }
+
+      .transcript {
+        font-size: 1.05rem;
+        line-height: 1.8;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      /* 텍스트 끝에 커서(캐럿) 표시 */
+      .transcript::after {
+        content: "";
+        display: inline-block;
+        width: 1px;
+        height: 1.1em;
+        margin-left: 2px;
+        background: var(--fg);
+        animation: blink 1s steps(1, start) infinite;
+        transform: translateY(2px);
+      }
+
+      @keyframes blink {
+        0%,
+        50% {
+          opacity: 1;
+        }
+        50.01%,
+        100% {
+          opacity: 0;
+        }
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .buttons {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      button {
+        border-radius: 999px;
+        border: 1px solid transparent;
+        padding: 8px 16px;
+        font-size: 0.9rem;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        font-family: inherit;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #f9fafb;
+        color: var(--fg);
+        transition: background 0.15s ease, border-color 0.15s ease,
+          transform 0.05s ease, opacity 0.12s ease;
+      }
+
+      button.primary {
+        background: var(--fg);
+        color: #ffffff;
+      }
+
+      button.primary:hover:not(:disabled) {
+        background: #020617;
+        transform: translateY(-0.5px);
+      }
+
+      button.secondary {
+        border-color: var(--border);
+        background: #f9fafb;
+      }
+
+      button.secondary:hover:not(:disabled) {
+        background: #f3f4f6;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+        transform: none;
+      }
+
+      .record-icon {
+        font-size: 0.7rem;
+      }
+
+      .hint {
+        font-size: 0.78rem;
+        color: var(--fg-soft);
+      }
+
+      .speakers {
+        margin-top: 4px;
+        border-top: 1px solid rgba(229, 231, 235, 0.9);
+        padding-top: 10px;
+      }
+
+      .speakers-title {
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--fg-soft);
+        margin-bottom: 4px;
+      }
+
+      .speaker-row {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 10px;
+        align-items: baseline;
+        padding: 4px 0;
+      }
+
+      .speaker-label {
+        font-size: 0.8rem;
+        color: var(--fg-soft);
+        white-space: nowrap;
+      }
+
+      .speaker-label::before {
+        content: "";
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--fg-soft);
+        margin-right: 6px;
+        transform: translateY(-1px);
+      }
+
+      .speaker-text {
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+
+      .error {
+        margin-top: 4px;
+        font-size: 0.8rem;
+        color: #dc2626;
+      }
+
+      @media (max-width: 640px) {
+        .surface {
+          padding: 20px 18px 16px;
+          border-radius: 20px;
+        }
+
+        .screen {
+          padding: 18px 18px;
+          min-height: 190px;
+        }
+
+        .shell {
+          padding: 16px;
+        }
+
+        .brand-main {
+          font-size: 0.8rem;
+        }
+
+        .transcript {
+          font-size: 0.98rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="surface">
+        <header class="top">
+          <div class="brand">
+            <div class="brand-dot"></div>
+            <div>
+              <div class="brand-main">Realtime Scribe</div>
+            </div>
+          </div>
+          <div class="status-pill">
+            <span class="status-dot idle" id="statusDot"></span>
+            <span class="status-label" id="statusLabel">Idle</span>
+          </div>
+        </header>
+
+        <section class="screen">
+          <div class="screen-inner">
+            <div id="placeholder" class="placeholder">
+              마이크 권한을 허용한 뒤<br />
+              <strong>Start</strong> 버튼을 누르고 말해 보세요.
+            </div>
+            <div id="transcript" class="transcript" style="display: none"></div>
+
+            <div class="speakers" id="speakersSection" style="display: none">
+              <div class="speakers-title">Speakers</div>
+              <div id="speakers"></div>
+            </div>
+          </div>
+        </section>
+
+        <footer class="toolbar">
+          <div class="buttons">
+            <button id="recordBtn" class="primary">
+              <span class="record-icon" id="recordIcon">●</span>
+              <span id="recordLabel">Start</span>
+            </button>
+            <button id="clearBtn" class="secondary">Clear</button>
+          </div>
+          <div class="hint">녹음 시작 후, 말하는 내용을 실시간으로 전사합니다.</div>
+        </footer>
+      </div>
+    </div>
+
+    <script>
+      // 백엔드는 /scribe-token 에서 single-use token을 반환해야 합니다.
+      // FastAPI 예시: GET /scribe-token -> { "token": "<single_use_token>" }
+
+      const SAMPLE_RATE = 16000;
+      const ELEVENLABS_MODEL_ID = "scribe_v2_realtime";
+
+      const recordBtn = document.getElementById("recordBtn");
+      const recordIcon = document.getElementById("recordIcon");
+      const recordLabel = document.getElementById("recordLabel");
+      const clearBtn = document.getElementById("clearBtn");
+      const statusLabel = document.getElementById("statusLabel");
+      const statusDot = document.getElementById("statusDot");
+      const placeholderEl = document.getElementById("placeholder");
+      const transcriptEl = document.getElementById("transcript");
+      const speakersSectionEl = document.getElementById("speakersSection");
+      const speakersEl = document.getElementById("speakers");
+      const errorEl = document.getElementById("error");
+
+      let ws = null;
+      let audioContext = null;
+      let processor = null;
+      let mediaStream = null;
+      let isRecording = false;
+
+      let partialText = "";
+      const segments = []; // { id, text, words? }
+
+      function setStatus(stateText, visualState) {
+        statusLabel.textContent = stateText;
+        if (visualState === "live") {
+          statusDot.classList.remove("idle");
+        } else {
+          statusDot.classList.add("idle");
+        }
+      }
+
+      function setError(message) {
+        errorEl.textContent = message || "";
+      }
+
+      function updateTranscript() {
+        const committedText = segments.map((s) => s.text).join(" ");
+        const fullText =
+          committedText +
+          (partialText ? (committedText ? " " : "") + partialText : "");
+
+        if (!fullText) {
+          transcriptEl.style.display = "none";
+          placeholderEl.style.display = "block";
+          return;
+        }
+
+        placeholderEl.style.display = "none";
+        transcriptEl.style.display = "block";
+        transcriptEl.textContent = fullText;
+      }
+
+      function getRawSpeakerKey(word) {
+        if (!word || typeof word !== "object") return null;
+        return (
+          word.speaker_id ??
+          word.speakerId ??
+          word.speaker_index ??
+          word.speakerIndex ??
+          word.speaker ??
+          null
+        );
+      }
+
+      function hasSpeakerInfo(allSegments) {
+        return allSegments.some(
+          (seg) =>
+            Array.isArray(seg.words) &&
+            seg.words.some((w) => getRawSpeakerKey(w) != null)
+        );
+      }
+
+      function speakerKeyToLabel(key) {
+        if (key == null) return "";
+        const s = String(key);
+        const m = s.match(/(\d+)/);
+        if (m) {
+          const n = Number(m[1]);
+          if (!Number.isNaN(n)) {
+            return "화자 " + n;
+          }
+        }
+        return "화자 " + s;
+      }
+
+      function renderSpeakers() {
+        // 화자 정보가 하나도 없으면 섹션 자체를 숨김
+        if (!hasSpeakerInfo(segments)) {
+          speakersSectionEl.style.display = "none";
+          speakersEl.innerHTML = "";
+          return;
+        }
+
+        const groups = [];
+        let currentGroup = null;
+
+        for (const seg of segments) {
+          if (!Array.isArray(seg.words) || !seg.words.length) continue;
+
+          for (const w of seg.words) {
+            const textPiece = w.text ?? w.word ?? "";
+            if (!textPiece) continue;
+
+            let speakerKey = getRawSpeakerKey(w);
+
+            if (speakerKey == null && currentGroup && currentGroup._speakerKey) {
+              // speaker 정보가 비어 있으면 이전 화자와 같은 것으로 취급 (연속성)
+              speakerKey = currentGroup._speakerKey;
+            }
+
+            if (speakerKey == null) {
+              // 여전히 speaker 정보가 없다면, 화자 구분에서는 제외 (텍스트는 transcript에 이미 반영됨)
+              continue;
+            }
+
+            if (!currentGroup || currentGroup._speakerKey !== speakerKey) {
+              currentGroup = {
+                _speakerKey: speakerKey,
+                speakerLabel: speakerKeyToLabel(speakerKey),
+                text: "",
+              };
+              groups.push(currentGroup);
+            }
+
+            currentGroup.text += textPiece;
+          }
+        }
+
+        if (!groups.length) {
+          speakersSectionEl.style.display = "none";
+          speakersEl.innerHTML = "";
+          return;
+        }
+
+        speakersSectionEl.style.display = "block";
+        speakersEl.innerHTML = "";
+
+        for (const g of groups) {
+          const row = document.createElement("div");
+          row.className = "speaker-row";
+
+          const label = document.createElement("div");
+          label.className = "speaker-label";
+          label.textContent = g.speakerLabel;
+
+          const textEl = document.createElement("div");
+          textEl.className = "speaker-text";
+          textEl.textContent = g.text;
+
+          row.appendChild(label);
+          row.appendChild(textEl);
+          speakersEl.appendChild(row);
+        }
+      }
+
+      function floatTo16BitPCM(float32Array) {
+        const pcm = new Int16Array(float32Array.length);
+        for (let i = 0; i < float32Array.length; i++) {
+          let s = float32Array[i];
+          s = Math.max(-1, Math.min(1, s));
+          pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        }
+        return pcm;
+      }
+
+      function encodeBase64(int16Array) {
+        const bytes = new Uint8Array(int16Array.buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+      }
+
+      async function startAudio(token) {
+        setError("");
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setError("이 브라우저에서는 마이크를 사용할 수 없습니다.");
+          throw new Error("getUserMedia not supported");
+        }
+
+        const params = new URLSearchParams({
+          model_id: ELEVENLABS_MODEL_ID,
+          include_timestamps: "true",
+          audio_format: "pcm_16000",
+          token: token,
+        });
+
+        ws = new WebSocket(
+          "wss://api.elevenlabs.io/v1/speech-to-text/realtime?" +
+            params.toString()
+        );
+
+        ws.onopen = async () => {
+          try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
+            });
+
+            audioContext = new (window.AudioContext ||
+              window.webkitAudioContext)({
+              sampleRate: SAMPLE_RATE,
+            });
+
+            const source = audioContext.createMediaStreamSource(mediaStream);
+            const bufferSize = 4096;
+
+            processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+            processor.onaudioprocess = (event) => {
+              if (!isRecording || !ws || ws.readyState !== WebSocket.OPEN) {
+                return;
+              }
+
+              const floatData = event.inputBuffer.getChannelData(0);
+              const pcm16 = floatTo16BitPCM(floatData);
+              const base64 = encodeBase64(pcm16);
+
+              const payload = {
+                message_type: "input_audio_chunk",
+                audio_base_64: base64,
+                commit: false,
+                sample_rate: SAMPLE_RATE,
+              };
+
+              ws.send(JSON.stringify(payload));
+            };
+
+            source.connect(processor);
+            processor.connect(audioContext.destination);
+
+            isRecording = true;
+            recordBtn.disabled = false;
+            recordIcon.textContent = "⏹";
+            recordLabel.textContent = "Stop";
+            setStatus("Live", "live");
+          } catch (err) {
+            console.error(err);
+            setError("마이크를 열 수 없습니다. 브라우저 설정을 확인해주세요.");
+            stopAll(false);
+          }
+        };
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+
+          switch (data.message_type) {
+            case "session_started":
+              console.log("Session started", data);
+              break;
+            case "partial_transcript":
+              partialText = data.text || "";
+              updateTranscript();
+              break;
+            case "committed_transcript":
+              if (data.text) {
+                segments.push({
+                  id: data.segment_id || String(Date.now()),
+                  text: data.text,
+                  words: [],
+                });
+                partialText = "";
+                updateTranscript();
+                // words는 committed_transcript_with_timestamps 에서 채움
+              }
+              break;
+            case "committed_transcript_with_timestamps":
+              if (Array.isArray(data.words) && segments.length) {
+                const last = segments[segments.length - 1];
+                last.words = data.words;
+                renderSpeakers();
+              }
+              break;
+            case "input_error":
+            case "transcriber_error":
+            case "auth_error":
+            case "quota_exceeded":
+            case "error":
+              console.error("Scribe error:", data);
+              setError(
+                "Scribe 오류가 발생했습니다: " + (data.error || data.message_type)
+              );
+              break;
+            default:
+              break;
+          }
+        };
+
+        ws.onerror = (event) => {
+          console.error("WebSocket error", event);
+          setError("WebSocket 에러가 발생했습니다.");
+        };
+
+        ws.onclose = () => {
+          console.log("WebSocket closed");
+          stopAll(false);
+        };
+      }
+
+      function stopAll(sendCommit = true) {
+        if (processor) {
+          processor.disconnect();
+          processor.onaudioprocess = null;
+          processor = null;
+        }
+
+        if (audioContext) {
+          audioContext.close();
+          audioContext = null;
+        }
+
+        if (mediaStream) {
+          mediaStream.getTracks().forEach((t) => t.stop());
+          mediaStream = null;
+        }
+
+        if (ws && ws.readyState === WebSocket.OPEN && sendCommit) {
+          try {
+            ws.send(
+              JSON.stringify({
+                message_type: "input_audio_chunk",
+                audio_base_64: "",
+                commit: true,
+                sample_rate: SAMPLE_RATE,
+              })
+            );
+          } catch (e) {
+            console.warn("Failed to send final commit", e);
+          }
+        }
+
+        if (ws) {
+          try {
+            ws.close();
+          } catch (e) {
+            // ignore
+          }
+          ws = null;
+        }
+
+        isRecording = false;
+        recordIcon.textContent = "●";
+        recordLabel.textContent = "Start";
+        setStatus("Idle", "idle");
+      }
+
+      async function toggleRecording() {
+        if (isRecording) {
+          // stop
+          stopAll(true);
+          return;
+        }
+
+        recordBtn.disabled = true;
+        setError("");
+        setStatus("Connecting…", "idle");
+
+        try {
+          const resp = await fetch("/scribe-token");
+          if (!resp.ok) {
+            throw new Error("Failed to fetch token");
+          }
+
+          const data = await resp.json();
+          if (!data.token) {
+            throw new Error("Token missing in response");
+          }
+
+          await startAudio(data.token);
+        } catch (err) {
+          console.error(err);
+          setError("토큰을 가져오지 못했습니다. 백엔드 설정을 확인해주세요.");
+          setStatus("Idle", "idle");
+          recordBtn.disabled = false;
+        }
+      }
+
+      recordBtn.addEventListener("click", () => {
+        toggleRecording();
+      });
+
+      clearBtn.addEventListener("click", () => {
+        segments.length = 0;
+        partialText = "";
+        updateTranscript();
+        renderSpeakers();
+        setError("");
+      });
+
+      window.addEventListener("beforeunload", () => {
+        stopAll(false);
+      });
+    </script>
+  </body>
+</html>
